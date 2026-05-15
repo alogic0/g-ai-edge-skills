@@ -94,44 +94,6 @@ limitations under the License.
       font-weight: 700;
     }
 
-    #voice-toggle {
-      position: fixed;
-      right: 16px;
-      bottom: 16px;
-      z-index: 12;
-      min-height: 44px;
-      padding: 0 16px;
-      border: 0;
-      border-radius: 8px;
-      background: rgba(0, 0, 0, 0.72);
-      color: #ffffff;
-      font-size: 15px;
-      font-weight: 700;
-    }
-
-    #voice-toggle.off {
-      color: rgba(255, 255, 255, 0.7);
-    }
-
-    #robot-toggle {
-      position: fixed;
-      right: 16px;
-      bottom: 68px;
-      z-index: 12;
-      min-height: 38px;
-      padding: 0 12px;
-      border: 0;
-      border-radius: 8px;
-      background: rgba(0, 0, 0, 0.72);
-      color: #8dfcc1;
-      font-size: 14px;
-      font-weight: 700;
-    }
-
-    #robot-toggle.off {
-      color: rgba(255, 255, 255, 0.7);
-    }
-
     #target-panel {
       position: fixed;
       left: 0;
@@ -207,8 +169,6 @@ limitations under the License.
   <div id="status">Loading object detector...</div>
   <div id="counter">0</div>
   <button id="target-toggle" type="button" aria-expanded="false">Targets</button>
-  <button id="robot-toggle" type="button" aria-pressed="true">Robot voice</button>
-  <button id="voice-toggle" type="button" aria-pressed="false">Enable voice</button>
   <div id="target-panel" hidden>
     <p id="target-summary"></p>
     <div id="target-actions">
@@ -250,19 +210,12 @@ limitations under the License.
     const statusEl = document.getElementById('status');
     const counterEl = document.getElementById('counter');
     const targetToggle = document.getElementById('target-toggle');
-    const voiceToggle = document.getElementById('voice-toggle');
-    const robotToggle = document.getElementById('robot-toggle');
     const targetPanel = document.getElementById('target-panel');
     const targetSummary = document.getElementById('target-summary');
     const clearTargets = document.getElementById('clear-targets');
     const targetGrid = document.getElementById('target-grid');
 
     let objectDetector;
-    let voiceEnabled = false;
-    let robotVoiceEnabled = true;
-    let availableVoices = [];
-    const lastAnnouncementAt = new Map();
-    const ANNOUNCEMENT_COOLDOWN_MS = 6000;
 
     function clamp(value, min, max) {
       return Math.min(Math.max(value, min), max);
@@ -341,115 +294,6 @@ limitations under the License.
         targetGrid.appendChild(button);
       }
       setTargets(COCO_LABELS.filter((item) => targetSet.has(item)));
-    }
-
-    function getAnnouncementLabel(categoryName) {
-      return categoryName === 'person' ? 'human' : categoryName;
-    }
-
-    function setVoiceEnabled(enabled) {
-      voiceEnabled = enabled;
-      voiceToggle.textContent = enabled ? 'Voice on' : 'Enable voice';
-      voiceToggle.classList.toggle('off', !enabled);
-      voiceToggle.setAttribute('aria-pressed', String(enabled));
-      if (!enabled && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
-    }
-
-    function getSpeechText(text) {
-      return robotVoiceEnabled ? spellForRobotSpeech(text) : text;
-    }
-
-    function configureUtterance(utterance) {
-      if (robotVoiceEnabled) {
-        utterance.voice = getRobotVoice();
-        utterance.rate = 0.78;
-        utterance.pitch = 0.35;
-      } else {
-        utterance.rate = 1;
-        utterance.pitch = 1;
-      }
-      utterance.volume = 1;
-    }
-
-    function speak(text) {
-      if (!('speechSynthesis' in window)) {
-        statusEl.textContent = 'Voice is not supported in this webview';
-        setVoiceEnabled(false);
-        voiceToggle.disabled = true;
-        return false;
-      }
-
-      const utterance = new SpeechSynthesisUtterance(getSpeechText(text));
-      configureUtterance(utterance);
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
-      return true;
-    }
-
-    function enableVoiceFromUserGesture() {
-      if (speak('voice ready')) {
-        setVoiceEnabled(true);
-      }
-    }
-
-    function setRobotVoiceEnabled(enabled) {
-      robotVoiceEnabled = enabled;
-      robotToggle.textContent = enabled ? 'Robot voice' : 'Normal voice';
-      robotToggle.classList.toggle('off', !enabled);
-      robotToggle.setAttribute('aria-pressed', String(enabled));
-    }
-
-    function loadVoices() {
-      if (!('speechSynthesis' in window)) {
-        return;
-      }
-      availableVoices = window.speechSynthesis.getVoices();
-    }
-
-    function getRobotVoice() {
-      if (availableVoices.length === 0) {
-        loadVoices();
-      }
-
-      return availableVoices.find((voice) => {
-        const name = voice.name.toLowerCase();
-        return name.includes('google') ||
-          name.includes('android') ||
-          name.includes('default') ||
-          name.includes('system');
-      }) || availableVoices[0] || null;
-    }
-
-    function spellForRobotSpeech(text) {
-      return text.toUpperCase().replaceAll(' ', '. ');
-    }
-
-    function announceDetections(matches) {
-      if (!voiceEnabled || !('speechSynthesis' in window)) {
-        return;
-      }
-
-      const now = performance.now();
-      const detectedCategories = new Set();
-      for (const match of matches) {
-        const category = getCategory(match);
-        if (category) {
-          detectedCategories.add(category.categoryName);
-        }
-      }
-
-      for (const categoryName of detectedCategories) {
-        const lastSpoken = lastAnnouncementAt.get(categoryName) || 0;
-        if (now - lastSpoken < ANNOUNCEMENT_COOLDOWN_MS) {
-          continue;
-        }
-
-        lastAnnouncementAt.set(categoryName, now);
-        const announcement = `${getAnnouncementLabel(categoryName)} detected`;
-        speak(announcement);
-      }
     }
 
     function resizeCanvas() {
@@ -536,7 +380,6 @@ limitations under the License.
         (matches.length === 1 ?
           `1 ${formatTargets()} detection` :
           `${matches.length} ${formatTargets()} detections`);
-      announceDetections(matches);
 
       ctx.lineWidth = 4;
       ctx.font = '700 16px Segoe UI, system-ui, sans-serif';
@@ -589,22 +432,6 @@ limitations under the License.
         clearTargets.addEventListener('click', () => {
           setTargets([]);
         });
-        voiceToggle.addEventListener('click', () => {
-          if (voiceEnabled) {
-            setVoiceEnabled(false);
-          } else {
-            enableVoiceFromUserGesture();
-          }
-        });
-        robotToggle.addEventListener('click', () => {
-          setRobotVoiceEnabled(!robotVoiceEnabled);
-        });
-        if ('speechSynthesis' in window) {
-          loadVoices();
-          window.speechSynthesis.onvoiceschanged = loadVoices;
-        }
-        setVoiceEnabled(false);
-        setRobotVoiceEnabled(true);
         renderTargetSelector();
         await startCamera();
         statusEl.textContent = 'Loading MediaPipe object detector...';
