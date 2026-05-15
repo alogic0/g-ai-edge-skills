@@ -78,6 +78,70 @@ limitations under the License.
       font-weight: 800;
       text-align: center;
     }
+
+    #target-toggle {
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      z-index: 12;
+      min-height: 44px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.72);
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    #target-panel {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 11;
+      max-height: 46vh;
+      padding: 14px 14px 72px;
+      overflow-y: auto;
+      background: rgba(8, 10, 12, 0.94);
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      box-sizing: border-box;
+    }
+
+    #target-panel[hidden] {
+      display: none;
+    }
+
+    #target-summary {
+      margin: 0 0 10px;
+      color: #ffffff;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    #target-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+      gap: 8px;
+    }
+
+    .target-chip {
+      min-height: 38px;
+      padding: 0 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .target-chip.active {
+      border-color: #35f28f;
+      background: #35f28f;
+      color: #06160d;
+      font-weight: 800;
+    }
   </style>
 </head>
 <body>
@@ -87,6 +151,11 @@ limitations under the License.
   </div>
   <div id="status">Loading object detector...</div>
   <div id="counter">0</div>
+  <button id="target-toggle" type="button" aria-expanded="false">Targets</button>
+  <div id="target-panel" hidden>
+    <p id="target-summary"></p>
+    <div id="target-grid"></div>
+  </div>
 
   <script type="module">
     import {
@@ -95,8 +164,24 @@ limitations under the License.
     } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs";
 
     const params = new URLSearchParams(window.location.search);
-    const targets = parseTargets(params);
-    const targetSet = new Set(targets);
+    const COCO_LABELS = [
+      'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train',
+      'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign',
+      'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
+      'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella',
+      'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard',
+      'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard',
+      'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup', 'fork',
+      'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange',
+      'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair',
+      'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv',
+      'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave',
+      'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
+      'scissors', 'teddy bear', 'hair drier', 'toothbrush'
+    ];
+
+    let targets = parseTargets(params);
+    let targetSet = new Set(targets);
     const minScore = clamp(Number(params.get('minScore')) || 0.55, 0.05, 0.95);
 
     const video = document.getElementById('webcam');
@@ -104,6 +189,10 @@ limitations under the License.
     const ctx = canvas.getContext('2d');
     const statusEl = document.getElementById('status');
     const counterEl = document.getElementById('counter');
+    const targetToggle = document.getElementById('target-toggle');
+    const targetPanel = document.getElementById('target-panel');
+    const targetSummary = document.getElementById('target-summary');
+    const targetGrid = document.getElementById('target-grid');
 
     let objectDetector;
 
@@ -134,6 +223,9 @@ limitations under the License.
     }
 
     function formatTargets() {
+      if (targets.length === 0) {
+        return 'objects';
+      }
       if (targets.length === 1) {
         return targets[0];
       }
@@ -141,6 +233,46 @@ limitations under the License.
         return `${targets[0]} or ${targets[1]}`;
       }
       return `${targets.slice(0, -1).join(', ')}, or ${targets[targets.length - 1]}`;
+    }
+
+    function updateTargetSummary() {
+      targetSummary.textContent = targets.length > 0 ?
+        `Detecting: ${targets.join(', ')}` :
+        'No targets selected';
+      targetToggle.textContent = targets.length > 0 ?
+        `Targets (${targets.length})` :
+        'Targets';
+    }
+
+    function setTargets(nextTargets) {
+      targets = nextTargets;
+      targetSet = new Set(targets);
+      updateTargetSummary();
+      for (const button of targetGrid.querySelectorAll('.target-chip')) {
+        button.classList.toggle('active', targetSet.has(button.dataset.target));
+      }
+    }
+
+    function renderTargetSelector() {
+      targetGrid.innerHTML = '';
+      for (const label of COCO_LABELS) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'target-chip';
+        button.dataset.target = label;
+        button.textContent = label;
+        button.addEventListener('click', () => {
+          const nextSet = new Set(targets);
+          if (nextSet.has(label)) {
+            nextSet.delete(label);
+          } else {
+            nextSet.add(label);
+          }
+          setTargets(COCO_LABELS.filter((item) => nextSet.has(item)));
+        });
+        targetGrid.appendChild(button);
+      }
+      setTargets(COCO_LABELS.filter((item) => targetSet.has(item)));
     }
 
     function resizeCanvas() {
@@ -222,9 +354,11 @@ limitations under the License.
       });
 
       counterEl.textContent = String(matches.length);
-      statusEl.textContent = matches.length === 1 ?
-        `1 ${formatTargets()} detection` :
-        `${matches.length} ${formatTargets()} detections`;
+      statusEl.textContent = targets.length === 0 ?
+        'Select targets' :
+        (matches.length === 1 ?
+          `1 ${formatTargets()} detection` :
+          `${matches.length} ${formatTargets()} detections`);
 
       ctx.lineWidth = 4;
       ctx.font = '700 16px Segoe UI, system-ui, sans-serif';
@@ -269,6 +403,12 @@ limitations under the License.
       try {
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
+        targetToggle.addEventListener('click', () => {
+          const expanded = targetPanel.hidden;
+          targetPanel.hidden = !expanded;
+          targetToggle.setAttribute('aria-expanded', String(expanded));
+        });
+        renderTargetSelector();
         await startCamera();
         statusEl.textContent = 'Loading MediaPipe object detector...';
         const filesetResolver = await FilesetResolver.forVisionTasks(

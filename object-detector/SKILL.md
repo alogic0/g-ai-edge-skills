@@ -14,3 +14,5 @@ You MUST use the `run_js` tool with the following exact parameters:
   - target: String. A single object label to detect when the user asks for one object.
   - label: String. Backward-compatible single object label; treat it like `target`.
   - minScore: Number between 0 and 1. The minimum confidence score for showing detections. Use 0.55 when the user does not specify one.
+
+The webview includes a target selector, so the user can change the object list after the camera view opens.
