@@ -94,6 +94,25 @@ limitations under the License.
       font-weight: 700;
     }
 
+    #voice-toggle {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 12;
+      min-height: 44px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.72);
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    #voice-toggle.off {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
     #target-panel {
       position: fixed;
       left: 0;
@@ -169,6 +188,7 @@ limitations under the License.
   <div id="status">Loading object detector...</div>
   <div id="counter">0</div>
   <button id="target-toggle" type="button" aria-expanded="false">Targets</button>
+  <button id="voice-toggle" type="button" aria-pressed="true">Voice on</button>
   <div id="target-panel" hidden>
     <p id="target-summary"></p>
     <div id="target-actions">
@@ -210,12 +230,16 @@ limitations under the License.
     const statusEl = document.getElementById('status');
     const counterEl = document.getElementById('counter');
     const targetToggle = document.getElementById('target-toggle');
+    const voiceToggle = document.getElementById('voice-toggle');
     const targetPanel = document.getElementById('target-panel');
     const targetSummary = document.getElementById('target-summary');
     const clearTargets = document.getElementById('clear-targets');
     const targetGrid = document.getElementById('target-grid');
 
     let objectDetector;
+    let voiceEnabled = true;
+    const lastAnnouncementAt = new Map();
+    const ANNOUNCEMENT_COOLDOWN_MS = 6000;
 
     function clamp(value, min, max) {
       return Math.min(Math.max(value, min), max);
@@ -294,6 +318,50 @@ limitations under the License.
         targetGrid.appendChild(button);
       }
       setTargets(COCO_LABELS.filter((item) => targetSet.has(item)));
+    }
+
+    function getAnnouncementLabel(categoryName) {
+      return categoryName === 'person' ? 'human' : categoryName;
+    }
+
+    function setVoiceEnabled(enabled) {
+      voiceEnabled = enabled;
+      voiceToggle.textContent = enabled ? 'Voice on' : 'Voice off';
+      voiceToggle.classList.toggle('off', !enabled);
+      voiceToggle.setAttribute('aria-pressed', String(enabled));
+      if (!enabled && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    }
+
+    function announceDetections(matches) {
+      if (!voiceEnabled || !('speechSynthesis' in window)) {
+        return;
+      }
+
+      const now = performance.now();
+      const detectedCategories = new Set();
+      for (const match of matches) {
+        const category = getCategory(match);
+        if (category) {
+          detectedCategories.add(category.categoryName);
+        }
+      }
+
+      for (const categoryName of detectedCategories) {
+        const lastSpoken = lastAnnouncementAt.get(categoryName) || 0;
+        if (now - lastSpoken < ANNOUNCEMENT_COOLDOWN_MS) {
+          continue;
+        }
+
+        lastAnnouncementAt.set(categoryName, now);
+        const utterance = new SpeechSynthesisUtterance(
+          `${getAnnouncementLabel(categoryName)} detected`
+        );
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        window.speechSynthesis.speak(utterance);
+      }
     }
 
     function resizeCanvas() {
@@ -380,6 +448,7 @@ limitations under the License.
         (matches.length === 1 ?
           `1 ${formatTargets()} detection` :
           `${matches.length} ${formatTargets()} detections`);
+      announceDetections(matches);
 
       ctx.lineWidth = 4;
       ctx.font = '700 16px Segoe UI, system-ui, sans-serif';
@@ -432,6 +501,10 @@ limitations under the License.
         clearTargets.addEventListener('click', () => {
           setTargets([]);
         });
+        voiceToggle.addEventListener('click', () => {
+          setVoiceEnabled(!voiceEnabled);
+        });
+        setVoiceEnabled(true);
         renderTargetSelector();
         await startCamera();
         statusEl.textContent = 'Loading MediaPipe object detector...';
