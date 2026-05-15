@@ -119,6 +119,23 @@ limitations under the License.
       line-height: 1.35;
     }
 
+    #target-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 10px;
+    }
+
+    #clear-targets {
+      min-height: 36px;
+      padding: 0 12px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
     #target-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
@@ -154,6 +171,9 @@ limitations under the License.
   <button id="target-toggle" type="button" aria-expanded="false">Targets</button>
   <div id="target-panel" hidden>
     <p id="target-summary"></p>
+    <div id="target-actions">
+      <button id="clear-targets" type="button">Clear all</button>
+    </div>
     <div id="target-grid"></div>
   </div>
 
@@ -192,6 +212,7 @@ limitations under the License.
     const targetToggle = document.getElementById('target-toggle');
     const targetPanel = document.getElementById('target-panel');
     const targetSummary = document.getElementById('target-summary');
+    const clearTargets = document.getElementById('clear-targets');
     const targetGrid = document.getElementById('target-grid');
 
     let objectDetector;
@@ -218,7 +239,7 @@ limitations under the License.
         }
       }
 
-      const fallbackTarget = urlParams.get('target') || urlParams.get('label') || 'chair';
+      const fallbackTarget = urlParams.get('target') || urlParams.get('label') || '';
       return [fallbackTarget.trim().toLowerCase()].filter(Boolean);
     }
 
@@ -407,6 +428,9 @@ limitations under the License.
           const expanded = targetPanel.hidden;
           targetPanel.hidden = !expanded;
           targetToggle.setAttribute('aria-expanded', String(expanded));
+        });
+        clearTargets.addEventListener('click', () => {
+          setTargets([]);
         });
         renderTargetSelector();
         await startCamera();

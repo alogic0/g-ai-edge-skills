@@ -33,7 +33,7 @@ limitations under the License.
             .filter(Boolean);
         }
 
-        const singleTarget = jsonObj.target || jsonObj.label || 'chair';
+        const singleTarget = jsonObj.target || jsonObj.label || '';
         return [String(singleTarget).trim().toLowerCase()].filter(Boolean);
       }
 
@@ -41,7 +41,7 @@ limitations under the License.
         const jsonObj = JSON.parse(data || '{}');
         const targets = normalizeTargets(jsonObj);
         const minScore = Number.isFinite(Number(jsonObj.minScore)) ? Number(jsonObj.minScore) : 0.55;
-        const encodedTargets = encodeURIComponent(JSON.stringify(targets.length > 0 ? targets : ['chair']));
+        const encodedTargets = encodeURIComponent(JSON.stringify(targets));
 
         return JSON.stringify({
           webview: {

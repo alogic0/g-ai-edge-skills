@@ -12,10 +12,10 @@ You MUST use the `run_js` tool with the following exact parameters:
 - skill_name: `object-detector`
 - script_name: `index.html`
 - data: A JSON string with the following optional fields:
-  - targets: Array of object labels to detect, such as `["chair", "couch", "person"]`. Use `["chair"]` when the user does not specify targets.
+  - targets: Array of object labels to detect, such as `["chair", "couch", "person"]`. Use an empty array when the user does not specify targets.
   - target: String. A single object label to detect when the user asks for one object.
   - label: String. Backward-compatible single object label; treat it like `target`.
   - minScore: Number between 0 and 1. The minimum confidence score for showing detections. Use 0.55 when the user does not specify one.
 
-The webview includes a target selector, so the user can change the object list after the camera view opens.
+The webview includes a target selector, so the user can choose or clear the object list after the camera view opens.
 After calling the tool, tell the user to tap the preview card and allow camera permission.
