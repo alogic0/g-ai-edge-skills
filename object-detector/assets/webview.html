@@ -21,7 +21,7 @@ limitations under the License.
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chair Detector</title>
+  <title>Object Detector</title>
   <style>
     html,
     body {
@@ -85,7 +85,7 @@ limitations under the License.
     <video id="webcam" autoplay playsinline muted></video>
     <canvas id="overlay"></canvas>
   </div>
-  <div id="status">Loading chair detector...</div>
+  <div id="status">Loading object detector...</div>
   <div id="counter">0</div>
 
   <script type="module">
@@ -95,7 +95,8 @@ limitations under the License.
     } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs";
 
     const params = new URLSearchParams(window.location.search);
-    const requestedLabel = (params.get('label') || 'chair').toLowerCase();
+    const targets = parseTargets(params);
+    const targetSet = new Set(targets);
     const minScore = clamp(Number(params.get('minScore')) || 0.55, 0.05, 0.95);
 
     const video = document.getElementById('webcam');
@@ -108,6 +109,38 @@ limitations under the License.
 
     function clamp(value, min, max) {
       return Math.min(Math.max(value, min), max);
+    }
+
+    function parseTargets(urlParams) {
+      const rawTargets = urlParams.get('targets');
+      if (rawTargets) {
+        try {
+          const parsedTargets = JSON.parse(rawTargets);
+          if (Array.isArray(parsedTargets)) {
+            const normalized = parsedTargets
+              .map((target) => String(target).trim().toLowerCase())
+              .filter(Boolean);
+            if (normalized.length > 0) {
+              return normalized;
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to parse targets.', err);
+        }
+      }
+
+      const fallbackTarget = urlParams.get('target') || urlParams.get('label') || 'chair';
+      return [fallbackTarget.trim().toLowerCase()].filter(Boolean);
+    }
+
+    function formatTargets() {
+      if (targets.length === 1) {
+        return targets[0];
+      }
+      if (targets.length === 2) {
+        return `${targets[0]} or ${targets[1]}`;
+      }
+      return `${targets.slice(0, -1).join(', ')}, or ${targets[targets.length - 1]}`;
     }
 
     function resizeCanvas() {
@@ -181,29 +214,31 @@ limitations under the License.
       const rect = canvas.getBoundingClientRect();
       ctx.clearRect(0, 0, rect.width, rect.height);
 
-      const chairs = (result.detections || []).filter((detection) => {
+      const matches = (result.detections || []).filter((detection) => {
         const category = getCategory(detection);
         return category &&
-          category.categoryName === 'chair' &&
+          targetSet.has(category.categoryName) &&
           category.score >= minScore;
       });
 
-      counterEl.textContent = String(chairs.length);
-      statusEl.textContent = chairs.length === 1 ? '1 chair detected' : `${chairs.length} chairs detected`;
+      counterEl.textContent = String(matches.length);
+      statusEl.textContent = matches.length === 1 ?
+        `1 ${formatTargets()} detection` :
+        `${matches.length} ${formatTargets()} detections`;
 
       ctx.lineWidth = 4;
       ctx.font = '700 16px Segoe UI, system-ui, sans-serif';
       ctx.textBaseline = 'top';
 
-      for (const chair of chairs) {
-        const category = getCategory(chair);
+      for (const match of matches) {
+        const category = getCategory(match);
         const box = getDrawBox([
-          chair.boundingBox.originX,
-          chair.boundingBox.originY,
-          chair.boundingBox.width,
-          chair.boundingBox.height
+          match.boundingBox.originX,
+          match.boundingBox.originY,
+          match.boundingBox.width,
+          match.boundingBox.height
         ]);
-        const label = `${requestedLabel} ${Math.round(category.score * 100)}%`;
+        const label = `${category.categoryName} ${Math.round(category.score * 100)}%`;
 
         ctx.strokeStyle = '#35f28f';
         ctx.fillStyle = 'rgba(53, 242, 143, 0.16)';
@@ -248,7 +283,7 @@ limitations under the License.
           scoreThreshold: minScore,
           runningMode: "VIDEO"
         });
-        statusEl.textContent = 'Looking for chairs...';
+        statusEl.textContent = `Looking for ${formatTargets()}...`;
         detectLoop();
       } catch (err) {
         statusEl.textContent = `Init error: ${err.message}`;

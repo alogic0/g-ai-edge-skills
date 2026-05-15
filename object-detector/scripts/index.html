@@ -22,18 +22,30 @@ limitations under the License.
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Chair Detector</title>
+    <title>Object Detector</title>
   </head>
   <body>
     <script>
+      function normalizeTargets(jsonObj) {
+        if (Array.isArray(jsonObj.targets)) {
+          return jsonObj.targets
+            .map((target) => String(target).trim().toLowerCase())
+            .filter(Boolean);
+        }
+
+        const singleTarget = jsonObj.target || jsonObj.label || 'chair';
+        return [String(singleTarget).trim().toLowerCase()].filter(Boolean);
+      }
+
       window['ai_edge_gallery_get_result'] = async (data) => {
         const jsonObj = JSON.parse(data || '{}');
-        const label = encodeURIComponent(jsonObj.label || 'chair');
+        const targets = normalizeTargets(jsonObj);
         const minScore = Number.isFinite(Number(jsonObj.minScore)) ? Number(jsonObj.minScore) : 0.55;
+        const encodedTargets = encodeURIComponent(JSON.stringify(targets.length > 0 ? targets : ['chair']));
 
         return JSON.stringify({
           webview: {
-            url: `webview.html?label=${label}&minScore=${encodeURIComponent(minScore)}`
+            url: `webview.html?targets=${encodedTargets}&minScore=${encodeURIComponent(minScore)}`
           }
         });
       };
