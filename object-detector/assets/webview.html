@@ -412,7 +412,7 @@ limitations under the License.
         await startCamera();
         statusEl.textContent = 'Loading MediaPipe object detector...';
         const filesetResolver = await FilesetResolver.forVisionTasks(
-          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
         );
         objectDetector = await ObjectDetector.createFromOptions(filesetResolver, {
           baseOptions: {
