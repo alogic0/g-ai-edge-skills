@@ -113,6 +113,25 @@ limitations under the License.
       color: rgba(255, 255, 255, 0.7);
     }
 
+    #robot-toggle {
+      position: fixed;
+      right: 16px;
+      bottom: 68px;
+      z-index: 12;
+      min-height: 38px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.72);
+      color: #8dfcc1;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    #robot-toggle.off {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
     #target-panel {
       position: fixed;
       left: 0;
@@ -188,6 +207,7 @@ limitations under the License.
   <div id="status">Loading object detector...</div>
   <div id="counter">0</div>
   <button id="target-toggle" type="button" aria-expanded="false">Targets</button>
+  <button id="robot-toggle" type="button" aria-pressed="true">Robot voice</button>
   <button id="voice-toggle" type="button" aria-pressed="true">Voice on</button>
   <div id="target-panel" hidden>
     <p id="target-summary"></p>
@@ -231,6 +251,7 @@ limitations under the License.
     const counterEl = document.getElementById('counter');
     const targetToggle = document.getElementById('target-toggle');
     const voiceToggle = document.getElementById('voice-toggle');
+    const robotToggle = document.getElementById('robot-toggle');
     const targetPanel = document.getElementById('target-panel');
     const targetSummary = document.getElementById('target-summary');
     const clearTargets = document.getElementById('clear-targets');
@@ -238,6 +259,8 @@ limitations under the License.
 
     let objectDetector;
     let voiceEnabled = true;
+    let robotVoiceEnabled = true;
+    let availableVoices = [];
     const lastAnnouncementAt = new Map();
     const ANNOUNCEMENT_COOLDOWN_MS = 6000;
 
@@ -334,6 +357,38 @@ limitations under the License.
       }
     }
 
+    function setRobotVoiceEnabled(enabled) {
+      robotVoiceEnabled = enabled;
+      robotToggle.textContent = enabled ? 'Robot voice' : 'Normal voice';
+      robotToggle.classList.toggle('off', !enabled);
+      robotToggle.setAttribute('aria-pressed', String(enabled));
+    }
+
+    function loadVoices() {
+      if (!('speechSynthesis' in window)) {
+        return;
+      }
+      availableVoices = window.speechSynthesis.getVoices();
+    }
+
+    function getRobotVoice() {
+      if (availableVoices.length === 0) {
+        loadVoices();
+      }
+
+      return availableVoices.find((voice) => {
+        const name = voice.name.toLowerCase();
+        return name.includes('google') ||
+          name.includes('android') ||
+          name.includes('default') ||
+          name.includes('system');
+      }) || availableVoices[0] || null;
+    }
+
+    function spellForRobotSpeech(text) {
+      return text.toUpperCase().replaceAll(' ', '. ');
+    }
+
     function announceDetections(matches) {
       if (!voiceEnabled || !('speechSynthesis' in window)) {
         return;
@@ -355,11 +410,18 @@ limitations under the License.
         }
 
         lastAnnouncementAt.set(categoryName, now);
+        const announcement = `${getAnnouncementLabel(categoryName)} detected`;
         const utterance = new SpeechSynthesisUtterance(
-          `${getAnnouncementLabel(categoryName)} detected`
+          robotVoiceEnabled ? spellForRobotSpeech(announcement) : announcement
         );
-        utterance.rate = 1;
-        utterance.pitch = 1;
+        if (robotVoiceEnabled) {
+          utterance.voice = getRobotVoice();
+          utterance.rate = 0.78;
+          utterance.pitch = 0.35;
+        } else {
+          utterance.rate = 1;
+          utterance.pitch = 1;
+        }
         window.speechSynthesis.speak(utterance);
       }
     }
@@ -504,7 +566,15 @@ limitations under the License.
         voiceToggle.addEventListener('click', () => {
           setVoiceEnabled(!voiceEnabled);
         });
+        robotToggle.addEventListener('click', () => {
+          setRobotVoiceEnabled(!robotVoiceEnabled);
+        });
+        if ('speechSynthesis' in window) {
+          loadVoices();
+          window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
         setVoiceEnabled(true);
+        setRobotVoiceEnabled(true);
         renderTargetSelector();
         await startCamera();
         statusEl.textContent = 'Loading MediaPipe object detector...';
