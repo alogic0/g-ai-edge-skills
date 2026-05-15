@@ -17,5 +17,5 @@ You MUST use the `run_js` tool with the following exact parameters:
   - label: String. Backward-compatible single object label; treat it like `target`.
   - minScore: Number between 0 and 1. The minimum confidence score for showing detections. Use 0.55 when the user does not specify one.
 
-The webview includes a target selector, so the user can choose or clear the object list after the camera view opens. It also includes voice controls that announce detections, such as "human detected" for `person`, with robotic voice mode enabled by default.
-After calling the tool, tell the user to tap the preview card and allow camera permission.
+The webview includes a target selector, so the user can choose or clear the object list after the camera view opens. It also includes voice controls that announce detections, such as "human detected" for `person`, with robotic voice mode available.
+After calling the tool, tell the user to tap the preview card, allow camera permission, and tap Enable voice if they want spoken alerts.

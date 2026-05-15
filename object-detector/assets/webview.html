@@ -208,7 +208,7 @@ limitations under the License.
   <div id="counter">0</div>
   <button id="target-toggle" type="button" aria-expanded="false">Targets</button>
   <button id="robot-toggle" type="button" aria-pressed="true">Robot voice</button>
-  <button id="voice-toggle" type="button" aria-pressed="true">Voice on</button>
+  <button id="voice-toggle" type="button" aria-pressed="false">Enable voice</button>
   <div id="target-panel" hidden>
     <p id="target-summary"></p>
     <div id="target-actions">
@@ -258,7 +258,7 @@ limitations under the License.
     const targetGrid = document.getElementById('target-grid');
 
     let objectDetector;
-    let voiceEnabled = true;
+    let voiceEnabled = false;
     let robotVoiceEnabled = true;
     let availableVoices = [];
     const lastAnnouncementAt = new Map();
@@ -349,11 +349,48 @@ limitations under the License.
 
     function setVoiceEnabled(enabled) {
       voiceEnabled = enabled;
-      voiceToggle.textContent = enabled ? 'Voice on' : 'Voice off';
+      voiceToggle.textContent = enabled ? 'Voice on' : 'Enable voice';
       voiceToggle.classList.toggle('off', !enabled);
       voiceToggle.setAttribute('aria-pressed', String(enabled));
       if (!enabled && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
+      }
+    }
+
+    function getSpeechText(text) {
+      return robotVoiceEnabled ? spellForRobotSpeech(text) : text;
+    }
+
+    function configureUtterance(utterance) {
+      if (robotVoiceEnabled) {
+        utterance.voice = getRobotVoice();
+        utterance.rate = 0.78;
+        utterance.pitch = 0.35;
+      } else {
+        utterance.rate = 1;
+        utterance.pitch = 1;
+      }
+      utterance.volume = 1;
+    }
+
+    function speak(text) {
+      if (!('speechSynthesis' in window)) {
+        statusEl.textContent = 'Voice is not supported in this webview';
+        setVoiceEnabled(false);
+        voiceToggle.disabled = true;
+        return false;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(getSpeechText(text));
+      configureUtterance(utterance);
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+      return true;
+    }
+
+    function enableVoiceFromUserGesture() {
+      if (speak('voice ready')) {
+        setVoiceEnabled(true);
       }
     }
 
@@ -411,18 +448,7 @@ limitations under the License.
 
         lastAnnouncementAt.set(categoryName, now);
         const announcement = `${getAnnouncementLabel(categoryName)} detected`;
-        const utterance = new SpeechSynthesisUtterance(
-          robotVoiceEnabled ? spellForRobotSpeech(announcement) : announcement
-        );
-        if (robotVoiceEnabled) {
-          utterance.voice = getRobotVoice();
-          utterance.rate = 0.78;
-          utterance.pitch = 0.35;
-        } else {
-          utterance.rate = 1;
-          utterance.pitch = 1;
-        }
-        window.speechSynthesis.speak(utterance);
+        speak(announcement);
       }
     }
 
@@ -564,7 +590,11 @@ limitations under the License.
           setTargets([]);
         });
         voiceToggle.addEventListener('click', () => {
-          setVoiceEnabled(!voiceEnabled);
+          if (voiceEnabled) {
+            setVoiceEnabled(false);
+          } else {
+            enableVoiceFromUserGesture();
+          }
         });
         robotToggle.addEventListener('click', () => {
           setRobotVoiceEnabled(!robotVoiceEnabled);
@@ -573,7 +603,7 @@ limitations under the License.
           loadVoices();
           window.speechSynthesis.onvoiceschanged = loadVoices;
         }
-        setVoiceEnabled(true);
+        setVoiceEnabled(false);
         setRobotVoiceEnabled(true);
         renderTargetSelector();
         await startCamera();
